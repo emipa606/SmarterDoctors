@@ -264,6 +264,131 @@ namespace SmarterDoctors
         }
     }
 
+    [HarmonyPatch(typeof(WorkGiver_TakeToBedToOperate))]
+    [HarmonyPatch("PotentialWorkThingsGlobal")]
+    class Patch_WorkGiver_TakeToBedToOperate_PotentialWorkThingsGlobal
+    {
+        //public override IEnumerable<Thing> PotentialWorkThingsGlobal(Pawn pawn)
+        public static bool Prefix(ref Pawn pawn, ref IEnumerable<Thing> __result)
+        {
+            Log.Message("Hello from Patch_WorkGiver_TakeToBedToOperate_PotentialWorkThingsGlobal Prefix");
+            List<Pawn> pawns = pawn.Map.mapPawns.AllPawns;
+            //List<Pawn> pawns = pawn.Map.mapPawns.FreeColonists;
+            //Log.Message(pawns.Count().ToString());
+            //pawns.AddRange(pawn.Map.mapPawns.PrisonersOfColony);
+            Log.Message(pawns.Count().ToString());
+            __result = pawns;
+            return false;
+        }
+
+        public static void Postfix(ref Pawn pawn, ref IEnumerable<Thing> __result)
+        {
+            Log.Message("Hello from Patch_WorkGiver_TakeToBedToOperate_PotentialWorkThingsGlobal Postfix");
+            Log.Message(__result.Count().ToString());
+        }
+    }
+
+    [HarmonyPatch(typeof(WorkGiver_TakeToBedToOperate))]
+    [HarmonyPatch("ShouldSkip")]
+    class Patch_WorkGiver_TakeToBedToOperate_ShouldSkip
+    {
+        //public override bool ShouldSkip(Pawn pawn, bool forced = false)
+        public static bool Prefix(ref Pawn pawn, ref bool forced, ref bool __result)
+        {
+            Log.Message("Hello from Patch_WorkGiver_TakeToBedToOperate_ShouldSkip Prefix");
+            __result = false;
+            return false;
+        }
+    }
+
+
+    [HarmonyPatch(typeof(WorkGiver_TakeToBedToOperate))]
+    [HarmonyPatch("JobOnThing")]
+    class Patch_WorkGiver_TakeToBedToOperate_JobOnThing
+    {
+        //public override Job JobOnThing(Pawn pawn, Thing t, bool forced = false)
+        public static bool Prefix(ref Pawn pawn, ref Thing t, ref bool forced, ref Job __result)
+        {
+            Log.Message("Hello from Patch_WorkGiver_TakeToBedToOperate_JobOnThing Prefix: " + t.def.defName.ToString());
+            return true;
+        }
+    }
+
+
+
+    [HarmonyPatch(typeof(WorkGiver_TakeToBedToOperate))]
+    [HarmonyPatch("HasJobOnThing")]
+    class Patch_WorkGiver_TakeToBedToOperate_HasJobOnThing
+    {
+        //public override bool HasJobOnThing(Pawn pawn, Thing t, bool forced = false)
+        public static bool Prefix(ref Pawn pawn, ref Thing t, ref bool forced, ref bool __result)
+        {
+            Log.Message("Hello from Patch_WorkGiver_TakeToBedToOperate_HasJobOnThing Prefix: " + t.def.defName.ToString());
+            Pawn pawn2 = t as Pawn;
+            if (pawn2.training != null)
+            {
+                //skip animals for now
+                return true;
+            }
+            //if (pawn2 == null || pawn2 == pawn || pawn2.InBed() || !pawn2.RaceProps.IsFlesh || !HealthAIUtility.ShouldHaveSurgeryDoneNow(pawn2) || !pawn.CanReserve(pawn2, 1, -1, null, forced) || (pawn2.InMentalState && pawn2.MentalStateDef.IsAggro))
+            //Log.Message("Names: " + pawn.Name.ToStringShort + ", " + pawn2.Name.ToStringShort);
+            Log.Message("Got here: 1");
+            if (pawn2 == null || pawn2 == pawn || !pawn2.RaceProps.IsFlesh || !pawn.CanReserve(pawn2, 1, -1, null, forced) || (pawn2.InMentalState && pawn2.MentalStateDef.IsAggro))
+            {
+                __result = false;
+                return false;
+            }
+            Log.Message("Got here: 2");
+            if (!HealthAIUtility.ShouldHaveSurgeryDoneNow(pawn2))
+            {
+                if (!pawn2.InBed() || !pawn2.CurrentBed().Medical)
+                {
+                    __result = false;
+                    return false;
+                }
+            }
+            if (HealthAIUtility.ShouldHaveSurgeryDoneNow(pawn2))
+            {
+                if (pawn2.InBed() && pawn2.CurrentBed().Medical)
+                {
+                    __result = false;
+                    return false;
+                }
+            }
+            Log.Message("Got here: 3");
+            if (!pawn2.Downed)
+            {
+                //if (pawn2.IsColonist)
+                //{
+                //    __result = false;
+                //    return false;
+                //}
+                if (!pawn2.IsPrisonerOfColony && pawn2.Faction != Faction.OfPlayer)
+                {
+                    __result = false;
+                    return false;
+                }
+                if (pawn2.guest != null && pawn2.guest.Released)
+                {
+                    __result = false;
+                    return false;
+                }
+            }
+            //Building_Bed building_Bed = FindBed(pawn, pawn2);
+            Log.Message("Got here: 4");
+            Building_Bed building_Bed = RestUtility.FindBedFor(pawn2, pawn, pawn2.HostFaction == pawn.Faction, checkSocialProperness: false);
+            if (building_Bed != null && pawn2.CanReserve(building_Bed, building_Bed.SleepingSlotsCount))
+            {
+                //return true;
+                __result = true;
+                return false;
+            }
+            __result = false;
+            return false;
+        }
+    }
+
+
     //[HarmonyPatch(typeof(JobDriver_Repair))]
     //[HarmonyPatch("MakeNewToils")]
     class Patch_JobDriver_Repair_MakeNewToils
